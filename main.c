@@ -139,16 +139,28 @@ void readRootDirectory(){
     for(int i = 0; i< boot.BPB_RootEntCnt;i++){
         Directory currentDir = rootDirEx[i];
         if(currentDir.DIR_Attr != 0x0){
-            printf("%-18u",((currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
+            printf("%-18u",((uint16_t)(currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
             printDate(currentDir.DIR_CrtDate);
             printTime(currentDir.DIR_CrtTime);
-            printf("%-17s",currentDir.DIR_Name);
+            printATTR(currentDir.DIR_Attr);
+            printf("           ");
             printf("%-13u",currentDir.DIR_FileSize);
             printf("%-15s\n",currentDir.DIR_Name);
+            
         }
     }
 }
 
+void printATTR(uint8_t attr) {
+    char letters[] = "ADVSHR";
+    for (int i = 0; i < 6; i++) {
+        if (attr & (1 << (5 - i))) {
+            printf("%c", letters[i]);
+        } else {
+            printf("-");
+        }
+    }
+}
 
 int readSectionOfTextFile() {
     int file = open("test.txt", O_RDONLY);
