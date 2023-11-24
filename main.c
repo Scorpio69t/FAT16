@@ -7,6 +7,11 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 
 typedef struct __attribute__((__packed__)) {
@@ -47,11 +52,103 @@ typedef struct __attribute__((__packed__)) {
     uint32_t DIR_FileSize; // File size in bytes 
     //use this size combined with the bytes per cluster and sectors per cluster, once ive read in the first cluster 
 } Directory;
-
+BootSector boot;
+Directory dir;
+int file;
 
 int main(){
-    return taskThree(1);
+    //TASK TWO
+    //OPEN the FAT file
+    file = open("fat16.img", O_RDONLY);
+    readBoot();
+    readRootDirectory();
+    //getClusters(5);
+    close(file);
+    return 0;
 }
+void readBoot(){
+    int toRead = read(file, &boot, sizeof(boot));
+    printf("Bytes per Sector: %d\n",boot.BPB_BytsPerSec);
+    printf("Sectors per Cluster: %d\n",boot.BPB_SecPerClus);
+    printf("Reserved Sector Count: %d\n",boot.BPB_RsvdSecCnt);
+    printf("Number of copies of FAT: %d\n",boot.BPB_NumFATs);
+    printf("FAT12/FAT16: size of root DIR: %d\n",boot.BPB_RootEntCnt);
+    printf("Sectors, may be 0, see below: %d\n",boot.BPB_TotSec16);
+    printf("Sectors in FAT (FAT12 or FAT16): %d\n",boot.BPB_FATSz16);
+    printf("Sectors if BPB_TotSec16 == 0: %d\n",boot.BPB_TotSec32);
+    printf("Non zero terminated string: %d\n",boot.BS_VolLab);
+}
+
+void printDate(uint16_t date){
+    int year = ((date >> 9) & 0x7f)+1980;
+    int month = (date >> 5) & 0x0F;
+    int day = date & 0x1F;
+    printf("%04d-%02d-%02d  ",year,month,day);
+}
+void printTime(uint16_t time){
+    int seconds = (time >> 11)&0x1f;
+    int minutes = (time >> 5)&0x3f;
+    int hours = (time & 0x1f)*2;
+     printf("%02d-%02d-%02d  ",seconds,minutes,hours);
+}
+void getFileAttributes(uint8_t attribute){
+    if(attribute & 5){
+        printf("A");
+    }
+    if(attribute >> 4 == 1){
+        printf("D");
+    }
+    if(attribute >> 3 == 1){
+        printf("V");
+    }
+    if(attribute >> 2){};
+}
+void getClusters(int startingCluster){
+    //TASK 3
+    //Get the start location of the FAT
+    off_t FATstartLocation = boot.BPB_RsvdSecCnt*boot.BPB_BytsPerSec;
+    //Get the size of the FAT
+    int fatSize = boot.BPB_FATSz16*boot.BPB_BytsPerSec;
+    //Seek to the start of the file
+    lseek(file,FATstartLocation,SEEK_SET);
+    //Allocate space in memory for the fat
+    uint16_t* fat = malloc(fatSize);
+    //READ the FAT
+    read(file,fat,fatSize);
+    //Checks to see if the starting cluster
+    if(fat[startingCluster] != 0){
+        //Creates an infinite loop to get to the end of the cluster
+        while(fat[startingCluster] < 0xfff8){
+            //Prints out the cluster location
+            printf("%d ",fat[startingCluster]);
+            //Chains to the next cluster
+            startingCluster = fat[startingCluster];
+        }
+        //Outputs the final cluster
+        printf("%d END\n", fat[startingCluster]);
+    }
+}
+
+void readRootDirectory(){
+    off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
+    ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
+    lseek(file,ROOTstartLocation,SEEK_SET);
+    Directory* rootDirEx = malloc(rootSize);
+    read(file,rootDirEx,rootSize);
+    printf("Starting Cluster  Last Modified  File Attributes  File Length  File Name\n");
+    for(int i = 0; i< boot.BPB_RootEntCnt;i++){
+        Directory currentDir = rootDirEx[i];
+        if(currentDir.DIR_Attr != 0x0){
+            printf("%u    ",((currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
+            printDate(currentDir.DIR_CrtDate);
+            printTime(currentDir.DIR_CrtTime);
+            printf("%s    ",currentDir.DIR_Name);
+            printf("%u    ",currentDir.DIR_FileSize);
+            printf("%s    \n",currentDir.DIR_Name);
+        }
+    }
+}
+
 
 int readSectionOfTextFile() {
     int file = open("test.txt", O_RDONLY);
@@ -64,45 +161,3 @@ int readSectionOfTextFile() {
     return 0;
 }
 
-int outputBootSector() {
-    BootSector taskTwoBootSector;
-    int file = open("fat16.img", O_RDONLY);
-    int toRead = read(file, &taskTwoBootSector, sizeof(taskTwoBootSector));
-    printf("Bytes per Sector: %d\n",taskTwoBootSector.BPB_BytsPerSec);
-    printf("Sectors per Cluster: %d\n",taskTwoBootSector.BPB_SecPerClus);
-    printf("Reserved Sector Count: %d\n",taskTwoBootSector.BPB_RsvdSecCnt);
-    printf("Number of copies of FAT: %d\n",taskTwoBootSector.BPB_NumFATs);
-    printf("FAT12/FAT16: size of root DIR: %d\n",taskTwoBootSector.BPB_RootEntCnt);
-    printf("Sectors, may be 0, see below: %d\n",taskTwoBootSector.BPB_TotSec16);
-    printf("Sectors in FAT (FAT12 or FAT16): %d\n",taskTwoBootSector.BPB_FATSz16);
-    printf("Sectors if BPB_TotSec16 == 0: %d\n",taskTwoBootSector.BPB_TotSec32);
-    printf("Non zero terminated string: %d\n",taskTwoBootSector.BS_VolLab);
-    close(file);
-    return 0;
-}
-
-int taskThree(int startingClusterNumber){
-    //Initialise the structures
-    BootSector boot;
-    Directory dir;
-    //Get the size of a cluster
-    int clusterSize = boot.BPB_BytsPerSec*boot.BPB_SecPerClus;
-    //Get the number of sectors
-    int numSec = boot.BPB_FATSz16;
-    //Get the start location of the fat
-    int startLocation = boot.BPB_RsvdSecCnt*boot.BPB_BytsPerSec;
-    //Open the FAT file
-    int file = open("fat16.img", O_RDONLY);
-    //Seek to the start of the file
-    lseek(file,startLocation,SEEK_SET);
-    //Load the fat into memory
-    uint16_t* fat = malloc(numSec*boot.BPB_BytsPerSec);
-    //Now read the fat
-    int readFat = read(file,fat,numSec*boot.BPB_BytsPerSec);
-    printf("Start Location: %d\n", startLocation);
-    for(int i = 0; i<10;i++){
-        printf("%d\n", fat[i]);
-    }
-    close(file);
-    return 0;
-}
