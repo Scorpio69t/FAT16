@@ -135,16 +135,16 @@ void readRootDirectory(){
     lseek(file,ROOTstartLocation,SEEK_SET);
     Directory* rootDirEx = malloc(rootSize);
     read(file,rootDirEx,rootSize);
-    printf("Starting Cluster  Last Modified  File Attributes  File Length  File Name\n");
+    printf("Starting Cluster  Last Modified         File Attributes  File Length  File Name\n");
     for(int i = 0; i< boot.BPB_RootEntCnt;i++){
         Directory currentDir = rootDirEx[i];
         if(currentDir.DIR_Attr != 0x0){
-            printf("%u    ",((currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
+            printf("%-18u",((currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
             printDate(currentDir.DIR_CrtDate);
             printTime(currentDir.DIR_CrtTime);
-            printf("%s    ",currentDir.DIR_Name);
-            printf("%u    ",currentDir.DIR_FileSize);
-            printf("%s    \n",currentDir.DIR_Name);
+            printf("%-17s",currentDir.DIR_Name);
+            printf("%-13u",currentDir.DIR_FileSize);
+            printf("%-15s\n",currentDir.DIR_Name);
         }
     }
 }
