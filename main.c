@@ -57,11 +57,11 @@ Directory dir;
 int file;
 
 int main(){
-    //TASK TWO
-    //OPEN the FAT file
     file = open("fat16.img", O_RDONLY);
     readBoot();
     readRootDirectory();
+    scanFile(2457);
+    
     //getClusters(5);
     close(file);
     return 0;
@@ -91,19 +91,8 @@ void printTime(uint16_t time){
     int hours = (time & 0x1f)*2;
      printf("%02d-%02d-%02d  ",seconds,minutes,hours);
 }
-void getFileAttributes(uint8_t attribute){
-    if(attribute & 5){
-        printf("A");
-    }
-    if(attribute >> 4 == 1){
-        printf("D");
-    }
-    if(attribute >> 3 == 1){
-        printf("V");
-    }
-    if(attribute >> 2){};
-}
-void getClusters(int startingCluster){
+
+int getClusters(int startingCluster){
     //TASK 3
     //Get the start location of the FAT
     off_t FATstartLocation = boot.BPB_RsvdSecCnt*boot.BPB_BytsPerSec;
@@ -117,18 +106,41 @@ void getClusters(int startingCluster){
     read(file,fat,fatSize);
     //Checks to see if the starting cluster
     if(fat[startingCluster] != 0){
-        //Creates an infinite loop to get to the end of the cluster
-        while(fat[startingCluster] < 0xfff8){
-            //Prints out the cluster location
-            printf("%d ",fat[startingCluster]);
-            //Chains to the next cluster
-            startingCluster = fat[startingCluster];
+        //Checks to see if it is the end of the cluster
+        if(fat[startingCluster] < 0xfff8){
+            //Returns the next cluster location
+            return fat[startingCluster];
+        }else{
+            return 0xfff8;
         }
-        //Outputs the final cluster
-        printf("%d END\n", fat[startingCluster]);
     }
 }
+char getByte(off_t currentCluster, off_t offset) {
+    // Get the start location of the data section
+    off_t startData = (boot.BPB_RsvdSecCnt + boot.BPB_NumFATs * boot.BPB_FATSz16) * boot.BPB_BytsPerSec + sizeof(dir) * boot.BPB_RootEntCnt;
+    // Calculate the byte offset of the requested byte
+    off_t byteOffset = startData + (currentCluster - 2) * boot.BPB_SecPerClus * boot.BPB_BytsPerSec + offset;
+    // Seek to the byte offset
+    lseek(file, byteOffset, SEEK_SET);
+    // Read the byte
+    char value;
+    ssize_t valueRead = read(file, &value, 1);
+    return value;
+}
 
+void scanFile(int startingCluster) {
+    off_t offset = 10;
+    while (startingCluster <= 0xfff8) {
+        //printf("%d ", startingCluster);
+        char value = getByte(startingCluster, offset);
+        printf("%c", value);
+        offset++;
+        if (offset >= boot.BPB_SecPerClus * boot.BPB_BytsPerSec) {
+            startingCluster = getClusters(startingCluster);
+            offset = 0;
+        }
+    }
+}
 void readRootDirectory(){
     off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
     ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
@@ -172,4 +184,3 @@ int readSectionOfTextFile() {
     close(file);
     return 0;
 }
-
