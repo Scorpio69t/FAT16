@@ -13,7 +13,19 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+typedef struct __attribute__((__packed__)){
+    off_t startingCluster;
+    uint8_t attributes;
+}File;
 
+typedef struct __attribute__((__packed__)){
+    char* dirEntry;
+}ShortDirEntry;
+
+typedef struct __attribute__((__packed__)){
+
+}Volume;
+Volume vol;
 typedef struct __attribute__((__packed__)) {
     uint8_t BS_jmpBoot[ 3 ]; // x86 jump instr. to boot code
     uint8_t BS_OEMName[ 8 ]; // What created the filesystem
@@ -50,7 +62,7 @@ typedef struct __attribute__((__packed__)) {
     uint16_t DIR_WrtDate; // Date of last write
     uint16_t DIR_FstClusLO; // Lower 16 bits file's 1st cluster
     uint32_t DIR_FileSize; // File size in bytes 
-    //use this size combined with the bytes per cluster and sectors per cluster, once ive read in the first cluster 
+
 } Directory;
 BootSector boot;
 Directory dir;
@@ -58,13 +70,12 @@ int file;
 
 int main(){
     file = open("fat16.img", O_RDONLY);
-    readBoot();
-    readRootDirectory();
-    scanFile(2457);
-    
-    //getClusters(5);
-    close(file);
-    return 0;
+    openFile("SCC.211");
+    //readBoot();
+    //readRootDirectory();
+    //scanFile(0,0);
+    // close(file);
+    // return 0;
 }
 void readBoot(){
     int toRead = read(file, &boot, sizeof(boot));
@@ -79,12 +90,36 @@ void readBoot(){
     printf("Non zero terminated string: %d\n",boot.BS_VolLab);
 }
 
+void openFile(char* shortFile){
+    read(file, &boot, sizeof(boot));
+    File toReturn;
+    off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
+    ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
+    lseek(file,ROOTstartLocation,SEEK_SET);
+    Directory* rootDirEx = malloc(rootSize);
+    read(file,rootDirEx,rootSize);
+    for(int i = 0; i< boot.BPB_RootEntCnt;i++){
+        Directory currentDir = rootDirEx[i];
+        if(currentDir.DIR_Attr != 0x0){
+            printf("%-15s , %s\n",currentDir.DIR_Name, shortFile);
+            char* dirName = malloc(sizeof(char)*12);
+            strncpy(dirName, currentDir.DIR_Name,11);
+            dirName[11] = '\\0';
+            if(strcmp(dirName,shortFile)==0){
+                printf("The directory name matches the short file name!");
+            } 
+        }
+    }
+    //return toReturn;
+}
+
 void printDate(uint16_t date){
     int year = ((date >> 9) & 0x7f)+1980;
     int month = (date >> 5) & 0x0F;
     int day = date & 0x1F;
     printf("%04d-%02d-%02d  ",year,month,day);
 }
+
 void printTime(uint16_t time){
     int seconds = (time >> 11)&0x1f;
     int minutes = (time >> 5)&0x3f;
@@ -115,6 +150,7 @@ int getClusters(int startingCluster){
         }
     }
 }
+
 char getByte(off_t currentCluster, off_t offset) {
     // Get the start location of the data section
     off_t startData = (boot.BPB_RsvdSecCnt + boot.BPB_NumFATs * boot.BPB_FATSz16) * boot.BPB_BytsPerSec + sizeof(dir) * boot.BPB_RootEntCnt;
@@ -128,8 +164,7 @@ char getByte(off_t currentCluster, off_t offset) {
     return value;
 }
 
-void scanFile(int startingCluster) {
-    off_t offset = 10;
+void scanFile(int startingCluster, off_t offset) {
     while (startingCluster <= 0xfff8) {
         //printf("%d ", startingCluster);
         char value = getByte(startingCluster, offset);
@@ -141,6 +176,7 @@ void scanFile(int startingCluster) {
         }
     }
 }
+
 void readRootDirectory(){
     off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
     ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
