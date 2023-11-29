@@ -195,19 +195,20 @@ void printName(off_t ROOTstartLocation, int i, int count){
         lseek(file,ROOTstartLocation+((i-x)*sizeof(LongDirectory)),SEEK_SET);
         LongDirectory* rootLDirEx = malloc(sizeof(LongDirectory));
         read(file,rootLDirEx,sizeof(LongDirectory));
+        
         for(int j = 0; j<10;j=j+2){
-            if(rootLDirEx[0].LDIR_Name1[j]!='�'){
+            if((char)rootLDirEx[0].LDIR_Name1[j]>0){
                 printf("%c",(char)rootLDirEx[0].LDIR_Name1[j]);
             }
             
         }
         for(int j = 0; j<12;j=j+2){
-            if((char)rootLDirEx[0].LDIR_Name1[j]!='\0'){
+            if((char)rootLDirEx[0].LDIR_Name2[j]>0){
                 printf("%c",(char)rootLDirEx[0].LDIR_Name2[j]);
             }
         }
         for(int j = 0; j<4;j=j+2){
-            if(rootLDirEx[0].LDIR_Name1[j]!='�'){
+            if((char)rootLDirEx[0].LDIR_Name3[j]>0){
                 printf("%c",(char)rootLDirEx[0].LDIR_Name3[j]);
             }
         }
@@ -219,9 +220,7 @@ void readRootDirectory(){
     off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
     ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
     lseek(file,ROOTstartLocation,SEEK_SET);
-    
     Directory* rootDirEx = malloc(rootSize);
-
     read(file,rootDirEx,rootSize);
     int count = 0;
     printf("Starting Cluster  Last Modified         File Attributes  File Length  File Name\n");
@@ -234,7 +233,11 @@ void readRootDirectory(){
             printATTR(currentDir.DIR_Attr);
             printf("           ");
             printf("%-13u",currentDir.DIR_FileSize);
-            printName(ROOTstartLocation,i,count);
+            if(count == 0){
+                printf("%s\n",currentDir.DIR_Name);
+            }else{
+                printName(ROOTstartLocation,i,count);
+            }
             count = 0;
         }else{
             count++;
