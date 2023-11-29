@@ -190,7 +190,30 @@ void scanFile(int startingCluster, off_t offset) {
         }
     }
 }
-
+void printName(off_t ROOTstartLocation, int i, int count){
+    for(int x = 1;x<=count;x++){
+        lseek(file,ROOTstartLocation+((i-x)*sizeof(LongDirectory)),SEEK_SET);
+        LongDirectory* rootLDirEx = malloc(sizeof(LongDirectory));
+        read(file,rootLDirEx,sizeof(LongDirectory));
+        for(int j = 0; j<10;j=j+2){
+            if(rootLDirEx[0].LDIR_Name1[j]!='�'){
+                printf("%c",(char)rootLDirEx[0].LDIR_Name1[j]);
+            }
+            
+        }
+        for(int j = 0; j<12;j=j+2){
+            if((char)rootLDirEx[0].LDIR_Name1[j]!='\0'){
+                printf("%c",(char)rootLDirEx[0].LDIR_Name2[j]);
+            }
+        }
+        for(int j = 0; j<4;j=j+2){
+            if(rootLDirEx[0].LDIR_Name1[j]!='�'){
+                printf("%c",(char)rootLDirEx[0].LDIR_Name3[j]);
+            }
+        }
+    }
+    printf("\n");
+}
 
 void readRootDirectory(){
     off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
@@ -204,30 +227,17 @@ void readRootDirectory(){
     printf("Starting Cluster  Last Modified         File Attributes  File Length  File Name\n");
     for(int i = 0; i< boot.BPB_RootEntCnt;i++){
         Directory currentDir = rootDirEx[i];
-        if(currentDir.DIR_Attr != 0x0){
+        if(currentDir.DIR_Attr != 0x0 && currentDir.DIR_Attr != 0x0f){
             printf("%-18u",(currentDir.DIR_FstClusHI << 16| currentDir.DIR_FstClusLO));
             printDate(currentDir.DIR_CrtDate);
             printTime(currentDir.DIR_CrtTime);
             printATTR(currentDir.DIR_Attr);
             printf("           ");
             printf("%-13u",currentDir.DIR_FileSize);
-            if(currentDir.DIR_Attr != 0x0f){
-                printf("%-15s\n",currentDir.DIR_Name); 
-            }else{
-                lseek(file,ROOTstartLocation+(i*sizeof(LongDirectory)),SEEK_SET);
-                LongDirectory* rootLDirEx = malloc(sizeof(LongDirectory));
-                read(file,rootLDirEx,sizeof(LongDirectory));
-                for(int j = 0; j<10;j=j+2){
-                    printf("%c",(char)rootLDirEx[0].LDIR_Name1[j]);
-                }
-                for(int j = 0; j<12;j=j+2){
-                    printf("%c",(char)rootLDirEx[0].LDIR_Name2[j]);
-                }
-                for(int j = 0; j<4;j=j+2){
-                    printf("%c",(char)rootLDirEx[0].LDIR_Name3[j]);
-                }
-                printf("\n");
-            }
+            printName(ROOTstartLocation,i,count);
+            count = 0;
+        }else{
+            count++;
         }
     }
 }
