@@ -77,6 +77,7 @@ typedef struct __attribute__((__packed__)){
 }LongDirectory;
 BootSector boot;
 Directory dir;
+LongDirectory ldir;
 Volume vol;
 int file;
 
@@ -189,9 +190,17 @@ void scanFile(int startingCluster, off_t offset) {
     }
 }
 void outputLongDirectory(LongDirectory* LDR, int position, int count){
-    for(int i = count+1;i>0;i--){
+    for(int i = count;i>0;i--){
         LongDirectory currentLDR = LDR[position-i];
-        printf("%c %c %c ",(char)currentLDR.LDIR_Name1,(char)currentLDR.LDIR_Name2,(char)currentLDR.LDIR_Name3);
+        for(int j = 0; j<10;j=j+2){
+            printf("%c",(const char*)currentLDR.LDIR_Name1[j]);
+        }
+        for(int j = 0; j<12;j=j+2){
+            printf("%c",(const char*)currentLDR.LDIR_Name2[j]);
+        }
+        for(int j = 0; j<4;j=j+2){
+            printf("%c",(const char*)currentLDR.LDIR_Name3[j]);
+        }
     }
     printf("\n");
 }
@@ -200,8 +209,9 @@ void readRootDirectory(){
     ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
     lseek(file,ROOTstartLocation,SEEK_SET);
     Directory* rootDirEx = malloc(rootSize);
-    LongDirectory* rootLDirEx = malloc(rootSize);
+    LongDirectory* rootLDirEx = malloc(sizeof(ldir)*boot.BPB_RootEntCnt);
     read(file,rootDirEx,rootSize);
+    read(file,rootLDirEx,rootSize);
     int count = 0;
     printf("Starting Cluster  Last Modified         File Attributes  File Length  File Name\n");
     for(int i = 0; i< boot.BPB_RootEntCnt;i++){
