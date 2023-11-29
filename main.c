@@ -25,7 +25,7 @@ typedef struct __attribute__((__packed__)){
 typedef struct __attribute__((__packed__)){
 
 }Volume;
-Volume vol;
+
 typedef struct __attribute__((__packed__)) {
     uint8_t BS_jmpBoot[ 3 ]; // x86 jump instr. to boot code
     uint8_t BS_OEMName[ 8 ]; // What created the filesystem
@@ -64,18 +64,30 @@ typedef struct __attribute__((__packed__)) {
     uint32_t DIR_FileSize; // File size in bytes 
 
 } Directory;
+
+typedef struct __attribute__((__packed__)){
+    uint8_t LDIR_Ord; // Order/ position in sequence/ set
+    uint8_t LDIR_Name1[ 10 ]; // First 5 UNICODE characters
+    uint8_t LDIR_Attr; // = ATTR_LONG_NAME (xx001111)
+    uint8_t LDIR_Type; // Should = 0
+    uint8_t LDIR_Chksum; // Checksum of short name
+    uint8_t LDIR_Name2[ 12 ]; // Middle 6 UNICODE characters
+    uint16_t LDIR_FstClusLO; // MUST be zero
+    uint8_t LDIR_Name3[ 4 ]; // Last 2 UNICODE characters
+}LongDirectory;
 BootSector boot;
 Directory dir;
+Volume vol;
 int file;
 
 int main(){
     file = open("fat16.img", O_RDONLY);
-    openFile("SCC.211");
-    //readBoot();
-    //readRootDirectory();
-    //scanFile(0,0);
-    // close(file);
-    // return 0;
+    //openFile("SCC.211");
+    readBoot();
+    readRootDirectory();
+    scanFile(2457,0);
+    close(file);
+    return 0;
 }
 void readBoot(){
     int toRead = read(file, &boot, sizeof(boot));
@@ -176,24 +188,36 @@ void scanFile(int startingCluster, off_t offset) {
         }
     }
 }
-
+void outputLongDirectory(LongDirectory* LDR, int position, int count){
+    for(int i = count;i>0;i--){
+        LongDirectory currentLDR = LDR[position-i];
+        printf("%c %c %c ",(char)currentLDR.LDIR_Name1,(char)currentLDR.LDIR_Name2,(char)currentLDR.LDIR_Name3);
+    }
+    printf("\n");
+}
 void readRootDirectory(){
     off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
     ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
     lseek(file,ROOTstartLocation,SEEK_SET);
     Directory* rootDirEx = malloc(rootSize);
+    LongDirectory* rootLDirEx = malloc(rootSize);
     read(file,rootDirEx,rootSize);
+    int count = 0;
     printf("Starting Cluster  Last Modified         File Attributes  File Length  File Name\n");
     for(int i = 0; i< boot.BPB_RootEntCnt;i++){
         Directory currentDir = rootDirEx[i];
-        if(currentDir.DIR_Attr != 0x0){
+        if(currentDir.DIR_Attr != 0x0 && currentDir.DIR_Attr != 0x0f){
             printf("%-18u",((uint16_t)(currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
             printDate(currentDir.DIR_CrtDate);
             printTime(currentDir.DIR_CrtTime);
             printATTR(currentDir.DIR_Attr);
             printf("           ");
             printf("%-13u",currentDir.DIR_FileSize);
-            printf("%-15s\n",currentDir.DIR_Name);
+            printf("%-15s%i\n",currentDir.DIR_Name,count);
+            outputLongDirectory(&rootLDirEx,i,count);
+            count = 0;
+        }else{
+            count = count + 1;
             
         }
     }
