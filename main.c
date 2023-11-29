@@ -75,6 +75,7 @@ typedef struct __attribute__((__packed__)){
     uint16_t LDIR_FstClusLO; // MUST be zero
     uint8_t LDIR_Name3[ 4 ]; // Last 2 UNICODE characters
 }LongDirectory;
+
 BootSector boot;
 Directory dir;
 LongDirectory ldir;
@@ -86,7 +87,7 @@ int main(){
     //openFile("SCC.211");
     readBoot();
     readRootDirectory();
-    scanFile(2457,0);
+    //scanFile(2457,0);
     close(file);
     return 0;
 }
@@ -189,42 +190,51 @@ void scanFile(int startingCluster, off_t offset) {
         }
     }
 }
+
 void outputLongDirectory(LongDirectory* LDR, int position, int count){
     for(int i = count;i>0;i--){
         LongDirectory currentLDR = LDR[position-i];
         for(int j = 0; j<10;j=j+2){
-            printf("%c",(const char*)currentLDR.LDIR_Name1[j]);
+            printf("%c",(char)currentLDR.LDIR_Name1[j]);
         }
         for(int j = 0; j<12;j=j+2){
-            printf("%c",(const char*)currentLDR.LDIR_Name2[j]);
+            printf("%c",(char)currentLDR.LDIR_Name2[j]);
         }
         for(int j = 0; j<4;j=j+2){
-            printf("%c",(const char*)currentLDR.LDIR_Name3[j]);
+            printf("%c",(char)currentLDR.LDIR_Name3[j]);
         }
     }
     printf("\n");
 }
+
 void readRootDirectory(){
     off_t ROOTstartLocation = (boot.BPB_RsvdSecCnt+boot.BPB_NumFATs*boot.BPB_FATSz16)*boot.BPB_BytsPerSec;
     ssize_t rootSize = sizeof(dir)*boot.BPB_RootEntCnt;
     lseek(file,ROOTstartLocation,SEEK_SET);
     Directory* rootDirEx = malloc(rootSize);
-    LongDirectory* rootLDirEx = malloc(sizeof(ldir)*boot.BPB_RootEntCnt);
+    LongDirectory* rootLDirEx = malloc(rootSize);
     read(file,rootDirEx,rootSize);
+    lseek(file,ROOTstartLocation,SEEK_SET);
     read(file,rootLDirEx,rootSize);
     int count = 0;
     printf("Starting Cluster  Last Modified         File Attributes  File Length  File Name\n");
     for(int i = 0; i< boot.BPB_RootEntCnt;i++){
         Directory currentDir = rootDirEx[i];
+        LongDirectory currentLDir;
         if(currentDir.DIR_Attr != 0x0 && currentDir.DIR_Attr != 0x0f){
-            printf("%-18u",((uint16_t)(currentDir.DIR_FstClusHI << 16)| currentDir.DIR_FstClusLO));
+            printf("%-18u",(currentDir.DIR_FstClusHI << 16| currentDir.DIR_FstClusLO));
             printDate(currentDir.DIR_CrtDate);
             printTime(currentDir.DIR_CrtTime);
             printATTR(currentDir.DIR_Attr);
             printf("           ");
             printf("%-13u",currentDir.DIR_FileSize);
-            printf("%-15s%i\n",currentDir.DIR_Name,count);
-            outputLongDirectory(&rootLDirEx,i,count);
+            if(count<2){
+                printf("%-15s\n",currentDir.DIR_Name);  
+            }else{
+                outputLongDirectory(&rootLDirEx,i,count);
+            }
+            
+            
             count = 0;
         }else{
             count = count + 1;
