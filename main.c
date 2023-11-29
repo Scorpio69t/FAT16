@@ -189,7 +189,7 @@ void scanFile(int startingCluster, off_t offset) {
     }
 }
 void outputLongDirectory(LongDirectory* LDR, int position, int count){
-    for(int i = count;i>0;i--){
+    for(int i = count+1;i>0;i--){
         LongDirectory currentLDR = LDR[position-i];
         printf("%c %c %c ",(char)currentLDR.LDIR_Name1,(char)currentLDR.LDIR_Name2,(char)currentLDR.LDIR_Name3);
     }
